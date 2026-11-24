@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>凌晨三點：回宿舍</title>
+<style>
+:root{
+  --bg:#10131b;
+  --panel:#1a2030;
+  --panel2:#222b3e;
+  --line:#3b4963;
+  --ink:#edf1f7;
+  --muted:#aab5c8;
+  --mint:#9ce6cf;
+  --pink:#f2a9bb;
+  --gold:#f0d18a;
+  --red:#ef8585;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  background:radial-gradient(ellipse at 50% 0%,#27334a 0%,#10131b 65%);
+  color:var(--ink);
+  font-family:"Cascadia Code","Consolas","Fira Code","Noto Sans TC","Microsoft JhengHei",monospace;
+  display:flex;
+  justify-content:center;
+  padding:22px 12px;
+}
+main{width:min(820px,100%)}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.brand{font-size:12px;letter-spacing:2px;color:var(--mint)}
+.clock{font-size:12px;color:var(--gold);border:1px solid var(--line);padding:7px 10px;border-radius:8px}
+h1{font-size:clamp(25px,6vw,42px);letter-spacing:2px;margin:8px 0 4px}
+.subtitle{color:var(--muted);font-size:12px}
+.card{background:linear-gradient(145deg,#1c2434,#151b28);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 12px 32px #0004}
+.scene{min-height:170px;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(135deg,#202b40,#171d2b);position:relative;overflow:hidden}
+.scene:after{content:"✦   ·       ✧        ·      ✦";position:absolute;right:14px;top:12px;color:#64738e;letter-spacing:7px;opacity:.6}
+.kicker{color:var(--mint);font-size:11px;letter-spacing:2px;margin-bottom:10px;font-weight:bold;text-transform:uppercase}
+.story{font-size:15px;line-height:1.95;white-space:pre-line;max-width:680px}
+.story em{color:var(--gold);font-style:normal;font-weight:bold}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat{background:#111722;border:1px solid #303b50;border-radius:10px;padding:11px}
+.statline{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:7px}
+.bar{height:8px;background:#30394b;border-radius:9px;overflow:hidden}
+.fill{height:100%;width:100%;background:var(--mint);transition:width .25s}
+.fill.enemy{background:var(--pink)}
+.inventory{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.item{font-size:11px;padding:6px 9px;border-radius:7px;background:#293449;border:1px solid #43516a;color:#dce7f5}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+button{
+  font:inherit;
+  font-size:12px;
+  color:var(--ink);
+  background:#2a354a;
+  border:1px solid #52627d;
+  border-radius:9px;
+  padding:12px 16px;
+  cursor:pointer;
+  transition:.15s;
+  min-height:44px;
+}
+button:hover{background:#394963;transform:translateY(-1px)}
+button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+button:disabled{opacity:.35;cursor:not-allowed;transform:none}
+button.primary{background:#31564f;border-color:#6ba895;color:#e6fff5}
+button.warn{background:#58333f;border-color:#9b6574}
+.log{font-size:12px;line-height:1.8;color:var(--muted);max-height:145px;overflow:auto}
+.log p{margin:3px 0}
+.log p:last-child{color:#e9d8a8}
+.hidden{display:none!important}
+footer{text-align:center;color:#748198;font-size:10px;margin:20px 0}
+
+/* 敵人頭像與皮膚相關樣式 */
+.enemy-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.enemy-avatar-wrap{
+  position:relative;
+  width:76px;
+  height:76px;
+  border-radius:12px;
+  background:#111722;
+  border:1px solid #43516a;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  box-shadow:inset 0 0 10px #0008;
+}
+.enemy-avatar{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:none;
+}
+.enemy-avatar.visible{display:block}
+.enemy-avatar-placeholder{font-size:36px;user-select:none}
+.skin-upload-btn{
+  font-size:11px;
+  color:var(--mint);
+  border:1px dashed #6ba895;
+  padding:4px 8px;
+  border-radius:6px;
+  cursor:pointer;
+  display:inline-block;
+  margin-top:6px;
+  transition:.15s;
+}
+.skin-upload-btn:hover{background:#31564f44}
+.skin-reset-btn{
+  font-size:10px;
+  color:#8899ac;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:2px 6px;
+  min-height:unset;
+  text-decoration:underline;
+}
+.skin-reset-btn:hover{color:var(--pink)}
+
+@media(max-width:520px){
+  .card{padding:14px}
+  .stats{grid-template-columns:1fr}
+  .story{font-size:14px}
+  .enemy-avatar-wrap{width:64px;height:64px}
+  .enemy-avatar-placeholder{font-size:28px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="brand">AFTER HOURS / DESIGN DEPT.</div>
+  <div class="clock" id="clock">03:00 AM</div>
+</header>
+<h1>凌晨三點：回宿舍</h1>
+<div class="subtitle">一款關於深夜、校園怪談，以及準時睡覺的文字冒險</div>
+
+<section class="card stats">
+  <div class="stat">
+    <div class="statline"><span>精神值 / HP</span><b id="hpText">100 / 100</b></div>
+    <div class="bar" role="progressbar" aria-label="玩家精神值" aria-valuemin="0" aria-valuemax="100" id="hpBarContainer">
+      <div class="fill" id="hpBar"></div>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="statline"><span>目前進度</span><b id="progress">剛剛醒來</b></div>
+    <div class="statline"><span>背包</span><span id="itemCount">0 件道具</span></div>
+    <div class="inventory" id="inventory"><span class="item">空空如也</span></div>
+  </div>
+</section>
+
+<section class="card scene">
+  <div class="kicker" id="kicker">PROLOGUE / 03:00</div>
+  <div class="story" id="story" aria-live="polite">你在系館的桌面上醒來。
+
+螢幕還亮著，設計軟體停在一張沒有存檔的作品。窗外的校園安靜得不太自然。手機顯示凌晨三點。
+
+你揉揉眼睛，決定先回宿舍。只要走過這段路，就能洗澡、上床，結束今天。</div>
+  <div class="actions" id="actions">
+    <button class="primary" onclick="startGame()">收拾東西，出發</button>
+  </div>
+</section>
+
+<section class="card hidden" id="battlePanel">
+  <div class="kicker">ENCOUNTER / COMBAT</div>
+  <div class="enemy-header">
+    <div class="enemy-avatar-wrap" id="enemyAvatarWrap">
+      <img id="enemyAvatar" class="enemy-avatar" alt="敵人外觀" src="" />
+      <div id="enemyAvatarPlaceholder" class="enemy-avatar-placeholder">👾</div>
+    </div>
+    <div style="flex:1">
+      <div class="statline">
+        <span id="enemyName" style="font-weight:bold;font-size:14px">敵人</span>
+        <b id="enemyHpText">--</b>
+      </div>
+      <div class="bar" role="progressbar" aria-label="敵人體力值" aria-valuemin="0" aria-valuemax="100" id="enemyBarContainer">
+        <div class="fill enemy" id="enemyBar"></div>
+      </div>
+      <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+        <label class="skin-upload-btn" title="上傳本機圖片為此怪物更換皮膚">
+          📷 更換皮膚
+          <input type="file" id="skinInput" accept="image/*" style="display:none" onchange="uploadMonsterSkin(event)" />
+        </label>
+        <button class="skin-reset-btn" id="skinResetBtn" style="display:none" onclick="resetMonsterSkin()">恢復預設外觀</button>
+      </div>
+    </div>
+  </div>
+  <p class="story" id="battleHint" style="font-size:12px;margin:8px 0 0"></p>
+</section>
+
+<section class="card">
+  <div class="kicker">FIELD NOTES / LOG</div>
+  <div class="log" id="log" role="log" aria-live="polite"><p>— 夜晚的校園紀錄 —</p></div>
+</section>
+
+<footer>MAKE IT HOME. GET SOME SLEEP. · 文字冒險遊戲</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let hp = 100, maxHp = 100, inventory = [], phase = "intro", eventData = null, enemy = null, stunned = false, burnTurns = 0, defend = false, gameEnded = false;
+
+const events = [
+ {name:"貓",desc:"轉角的販賣機旁，有一隻貓正坐在紙箱上。牠看了你一眼，尾巴輕輕晃動。",choices:[
+  ["摸牠","你蹲下來摸摸牠。貓咪沒有躲開，還在你的手邊蹭了一下。精神值 +10。",()=>{heal(10);gain("貓毛");}],
+  ["餵牠","你把背包裡的零食分給牠。牠吃得很開心，還留下了一枚幸運鈴鐺。",()=>gain("幸運鈴鐺")],
+  ["不做任何事","你們互相看了一會兒，然後各自走向自己的夜晚。",()=>{}]
+ ]},
+ {name:"黑冠麻鷺",desc:"草地邊站著一隻黑冠麻鷺。牠一動也不動，像是在思考校園裡某個尚未完成的作業。",choices:[
+  ["拍照","你悄悄拍下一張照片。照片意外地清晰，讓你心情好了些。",()=>{gain("麻鷺照片");heal(5);}],
+  ["嚇跑牠","你突然拍手，黑冠麻鷺立刻振翅飛走。草叢裡掉出一枚硬幣。",()=>gain("校園硬幣")],
+  ["不做任何事","你沒有打擾牠，安靜地從旁邊走過。",()=>{}]
+ ]},
+ {name:"神秘青蛙人",desc:"路燈下站著一個穿著青蛙布偶裝的人。牠（或他）朝你揮手，手裡似乎拿著什麼。",choices:[
+  ["友好打招呼","你禮貌地揮手。青蛙人點點頭，送你一顆薄荷糖。",()=>gain("薄荷糖")],
+  ["冷嘲熱諷","你吐槽了這身打扮。青蛙人沉默片刻，丟下一張神秘貼紙。",()=>gain("神秘貼紙")],
+  ["不做任何事","你們保持著微妙的沉默，最後你決定繼續趕路。",()=>{}]
+ ]}
+];
+
+// 怪物配置列表：可以在 image 欄位填寫本機圖片相對路徑（如 "./god67.png"）或網址
+const enemies = [
+ {
+   name:"67號戰神",
+   icon:"⚡",
+   image:"", // 預設留空，若有圖片可填入路徑，如 "images/god67.png"
+   hp:65,
+   max:65,
+   attack:18,
+   skill:"戰神怒吼！你的下一次行動被暫停。",
+   special:"stun",
+   desc:"一個氣勢驚人的身影擋住去路。頭頂浮現「67」兩個大字。"
+ },
+ {
+   name:"adobe",
+   icon:"🎨",
+   image:"", // 若有圖片可填入路徑，如 "images/adobe.png"
+   hp:75,
+   max:75,
+   attack:14,
+   skill:"軟體更新通知彈出！接下來兩次行動各受到 5 點干擾傷害。",
+   special:"burn",
+   desc:"熟悉的紅色圖示在空中旋轉，無數未存檔的視窗朝你襲來。"
+ },
+ {
+   name:"競選花車",
+   icon:"🚐",
+   image:"", // 若有圖片可填入路徑，如 "images/truck.png"
+   hp:85,
+   max:85,
+   attack:8,
+   skill:"音響突然爆音！造成強烈精神衝擊。",
+   special:"burst",
+   desc:"遠方傳來音響聲，一台裝飾華麗的競選花車緩緩朝道路中央推進。"
+ }
+];
+
+function log(t){
+  let p = document.createElement("p");
+  p.textContent = "› " + t;
+  $("log").appendChild(p);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+function renderStats(){
+  $("hpText").textContent = hp + " / " + maxHp;
+  let pct = Math.max(0, (hp / maxHp) * 100);
+  $("hpBar").style.width = pct + "%";
+  $("hpBarContainer").setAttribute("aria-valuenow", hp);
+  $("itemCount").textContent = inventory.length + " 件道具";
+  $("inventory").innerHTML = inventory.length 
+    ? inventory.map(x => '<span class="item">' + x + '</span>').join("") 
+    : '<span class="item">空空如也</span>';
+}
+
+function updateEnemy(){
+  if (!enemy) return;
+  $("enemyHpText").textContent = Math.max(0, enemy.hp) + " / " + enemy.max;
+  let pct = Math.max(0, (enemy.hp / enemy.max) * 100);
+  $("enemyBar").style.width = pct + "%";
+  $("enemyBarContainer").setAttribute("aria-valuenow", Math.max(0, enemy.hp));
+}
+
+// 更新敵人頭像 / 皮膚外觀
+function updateEnemyAvatar(){
+  if (!enemy) return;
+  const avatarImg = $("enemyAvatar");
+  const placeholder = $("enemyAvatarPlaceholder");
+  const resetBtn = $("skinResetBtn");
+
+  // 1. 優先檢查玩家自訂上傳的皮膚 (localStorage)
+  const savedSkin = localStorage.getItem("skin_" + enemy.name);
+  if (savedSkin) {
+    avatarImg.src = savedSkin;
+    avatarImg.classList.add("visible");
+    placeholder.style.display = "none";
+    resetBtn.style.display = "inline-block";
+    return;
+  }
+
+  // 2. 若無自訂上傳，檢查預設的 enemy.image
+  if (enemy.image) {
+    avatarImg.src = enemy.image;
+    avatarImg.onload = () => {
+      avatarImg.classList.add("visible");
+      placeholder.style.display = "none";
+    };
+    avatarImg.onerror = () => {
+      avatarImg.classList.remove("visible");
+      placeholder.style.display = "block";
+    };
+    resetBtn.style.display = "none";
+    return;
+  }
+
+  // 3. 無圖片時顯示預設圖示 (Icon)
+  avatarImg.classList.remove("visible");
+  avatarImg.src = "";
+  placeholder.textContent = enemy.icon || "👾";
+  placeholder.style.display = "block";
+  resetBtn.style.display = "none";
+}
+
+// 玩家點擊更換皮膚時觸發
+function uploadMonsterSkin(event){
+  const file = event.target.files && event.target.files[0];
+  if (!file || !enemy) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const dataUrl = e.target.result;
+    try {
+      localStorage.setItem("skin_" + enemy.name, dataUrl);
+    } catch(err) {
+      log("注意：圖片較大，暫存至當前連線，未寫入本機快取。");
+    }
+    updateEnemyAvatar();
+    log("已為「" + enemy.name + "」換上新的外觀！");
+  };
+  reader.readAsDataURL(file);
+  event.target.value = ""; // 清空選取狀態
+}
+
+// 重設為預設外觀
+function resetMonsterSkin(){
+  if (!enemy) return;
+  localStorage.removeItem("skin_" + enemy.name);
+  updateEnemyAvatar();
+  log("已還原「" + enemy.name + "」的預設外觀。");
+}
+
+function heal(n){
+  hp = Math.min(maxHp, hp + n);
+  log("精神值恢復 " + n + " 點。");
+  renderStats();
+}
+
+function gain(x){
+  inventory.push(x);
+  log("獲得道具：" + x + "。");
+  renderStats();
+}
+
+function setScene(k, s, buttons, isHtml = false){
+  $("kicker").textContent = k;
+  if (isHtml) {
+    $("story").innerHTML = s;
+  } else {
+    $("story").textContent = s;
+  }
+  $("actions").innerHTML = "";
+  buttons.forEach(b => {
+    let x = document.createElement("button");
+    x.textContent = b.label;
+    x.className = b.cls || "";
+    x.onclick = b.fn;
+    $("actions").appendChild(x);
+  });
+}
+
+function startGame(){
+  phase = "event";
+  $("progress").textContent = "校園夜行";
+  log("你離開系館，走進凌晨三點的校園。");
+  showEvent();
+}
+
+function showEvent(){
+  eventData = events[Math.floor(Math.random() * events.length)];
+  $("progress").textContent = "遭遇事件";
+  setScene("RANDOM EVENT / " + eventData.name, eventData.desc, eventData.choices.map(c => ({
+    label: c[0],
+    fn: () => chooseEvent(c)
+  })));
+}
+
+function chooseEvent(c){
+  c[2]();
+  setScene("EVENT CLEAR / " + eventData.name, c[1] + "\n\n你重新整理背包，繼續往宿舍的方向走。", [
+    {label:"繼續前進", cls:"primary", fn:showBattle}
+  ]);
+}
+
+function showBattle(){
+  phase = "battle";
+  enemy = JSON.parse(JSON.stringify(enemies[Math.floor(Math.random() * enemies.length)]));
+  stunned = false;
+  burnTurns = 0;
+  defend = false;
+  $("battlePanel").classList.remove("hidden");
+  $("progress").textContent = "遭遇戰鬥";
+  $("enemyName").textContent = enemy.name;
+  $("battleHint").textContent = enemy.desc;
+  updateEnemy();
+  updateEnemyAvatar();
+  log("阻礙出現：" + enemy.name + "！");
+  playerTurn();
+}
+
+function playerTurn(){
+  if (gameEnded) return;
+  if (stunned) {
+    stunned = false;
+    log("你被氣勢壓迫，這回合無法行動！");
+    setScene("PLAYER TURN / 行動中止", "你努力想邁開腳步，但精神壓力讓你動彈不得。這回合只能原地防守。", [
+      {label:"承受對方行動", cls:"primary", fn:enemyAction}
+    ]);
+    return;
+  }
+  
+  let dot = burnTurns > 0 ? 5 : 0;
+  if (dot) {
+    hp -= dot;
+    burnTurns--;
+    log("干擾影響造成 " + dot + " 點精神損耗。");
+    renderStats();
+    if (hp <= 0) { die(); return; }
+  }
+
+  let buttons = [
+    {label:"常規應對（造成 25 傷害）", cls:"primary", fn:() => playerAttack(25)},
+    {label:"架起防禦（下次受傷減半）", fn:()=>{ defend = true; log("你集中精神做好防禦姿態。"); enemyAction(); }}
+  ];
+  if (inventory.length) {
+    buttons.push({label:"使用道具", fn:openItemMenu});
+  }
+  setScene("PLAYER TURN / 選擇行動", "你看準空檔，準備採取行動。" + (burnTurns > 0 ? "\n干擾效果剩餘 " + burnTurns + " 次。" : ""), buttons);
+}
+
+function openItemMenu(){
+  let itemButtons = inventory.map((item, idx) => ({
+    label: item,
+    fn: () => useSpecificItem(idx)
+  }));
+  itemButtons.push({label:"‹ 返回行動選單", fn:playerTurn});
+  setScene("INVENTORY / 選擇要使用的道具", "背包中有以下物品，請選擇一項：", itemButtons);
+}
+
+function useSpecificItem(index){
+  let item = inventory.splice(index, 1)[0];
+  renderStats();
+  if (item === "薄荷糖" || item === "貓毛") {
+    heal(20);
+    log("使用了 " + item + "，精神提振了！");
+  } else if (item === "幸運鈴鐺" || item === "校園硬幣") {
+    log("你握緊 " + item + "，受到鼓舞，全力反擊造成 35 點傷害！");
+    playerAttack(35);
+    return;
+  } else if (item === "麻鷺照片") {
+    log("你出示了「麻鷺照片」，對手愣住了！本回合獲得喘息機會。");
+    enemy.hp -= 10;
+    updateEnemy();
+  } else {
+    log("你拿出了 " + item + "，散發出神祕的氛圍，稍微穩定了心神。");
+    heal(10);
+  }
+  enemyAction();
+}
+
+function playerAttack(dmg){
+  enemy.hp -= dmg;
+  log("你採取行動，對 " + enemy.name + " 造成 " + dmg + " 點傷害。");
+  updateEnemy();
+  if (enemy.hp <= 0) {
+    winBattle();
+    return;
+  }
+  enemyAction();
+}
+
+function enemyAction(){
+  if (gameEnded || phase !== "battle") return;
+  let msg = "";
+  if (enemy.special === "stun" && !enemy.usedSkill) {
+    enemy.usedSkill = true;
+    stunned = true;
+    msg = enemy.skill;
+    log(msg);
+  } else if (enemy.special === "burn" && !enemy.usedSkill) {
+    enemy.usedSkill = true;
+    burnTurns = 2;
+    msg = enemy.skill;
+    log(msg);
+  } else {
+    let dmg = enemy.attack;
+    if (enemy.special === "burst" && Math.random() < 0.25) {
+      dmg = Math.round(enemy.attack * 2.2);
+      msg = enemy.skill + " 造成重創 " + dmg + " 點！";
+    } else {
+      msg = enemy.name + " 發動行動，造成 " + dmg + " 點傷害。";
+    }
+    if (defend) {
+      dmg = Math.ceil(dmg * 0.5);
+      defend = false;
+      msg += "（你的防禦抵擋了部分傷害）";
+    }
+    hp -= dmg;
+    log(msg);
+    renderStats();
+  }
+  if (hp <= 0) { die(); return; }
+  setScene("ENEMY TURN / " + enemy.name, msg + "\n\n敵方行動結束，輪到你了。", [
+    {label:"確認戰況", cls:"primary", fn:playerTurn}
+  ]);
+}
+
+function winBattle(){
+  phase = "after";
+  $("battlePanel").classList.add("hidden");
+  $("progress").textContent = "突破阻礙";
+  log("阻礙解除，前方就是宿舍門口。");
+  setScene("BATTLE CLEAR / SAFE ROUTE", "眼前的混亂終於平息。你拍拍外套，確認鑰匙與手機都在口袋裡。\n\n夜風變得柔和，宿舍大門的感應燈就在前方十公尺。", [
+    {label:"刷卡進宿舍", cls:"primary", fn:endGame}
+  ]);
+}
+
+function die(){
+  gameEnded = true;
+  phase = "dead";
+  $("progress").textContent = "精神耗盡";
+  $("battlePanel").classList.add("hidden");
+  setScene("GAME OVER / 03:??", "精神值歸零。你再也撐不住沉重的眼皮。\n\n這趟回宿舍的夜路，暫時停在這裡。", [
+    {label:"重新嘗試", cls:"warn", fn:() => location.reload()}
+  ]);
+  log("你在通往宿舍的長椅上昏睡了過去。遊戲結束。");
+}
+
+function endGame(){
+  gameEnded = true;
+  phase = "end";
+  $("progress").textContent = "已抵達宿舍";
+  $("clock").textContent = "03:25 AM";
+  setScene("ENDING / GOOD NIGHT", "你終於回到宿舍，關上房門，把背包放在桌邊。\n\n洗漱完畢後，你躺進熟悉的床鋪。今天的作業、奇怪的遭遇，以及校園裡的聲響，都暫時留在了門外。\n\n<em>晚安。這次真的可以好好睡了。</em>", [
+    {label:"再玩一次", cls:"primary", fn:() => location.reload()}
+  ], true);
+  log("任務達成：平安返回寢室，結束今天。");
+}
+
+// 初始渲染
+renderStats();
+</script>
+</body>
+</html>
