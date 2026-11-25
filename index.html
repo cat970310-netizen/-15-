@@ -65,12 +65,59 @@ button:hover{background:#394963;transform:translateY(-1px)}
 button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 button:disabled{opacity:.35;cursor:not-allowed;transform:none}
 button.primary{background:#31564f;border-color:#6ba895;color:#e6fff5}
-button.warn{background:#58333f;border-color:#9b6574}
+button.warn{background:#58333f;border-color:#9b6574;color:#ffe6eb}
+button.trap{background:#632c3b;border-color:#e06d87;color:#ffebeb;font-weight:bold}
 .log{font-size:12px;line-height:1.8;color:var(--muted);max-height:145px;overflow:auto}
 .log p{margin:3px 0}
 .log p:last-child{color:#e9d8a8}
 .hidden{display:none!important}
 footer{text-align:center;color:#748198;font-size:10px;margin:20px 0}
+
+/* 特效橫幅與彈幕 */
+.danmaku-banner{
+  background:linear-gradient(90deg,#ff6b8b,#ff8e53);
+  color:#fff;
+  padding:8px 12px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:bold;
+  text-align:center;
+  margin-bottom:10px;
+  box-shadow:0 4px 15px rgba(255,107,139,0.3);
+  animation:pulse 1.2s infinite alternate;
+}
+.shout-banner{
+  background:linear-gradient(90deg,#d35400,#f39c12);
+  color:#fff;
+  padding:8px 12px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:bold;
+  text-align:center;
+  margin-bottom:10px;
+  letter-spacing:1px;
+}
+.broadcast-banner{
+  background:linear-gradient(90deg,#2980b9,#2c3e50);
+  color:#f1c40f;
+  padding:8px 12px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:bold;
+  text-align:center;
+  margin-bottom:10px;
+  border:1px dashed #f1c40f;
+}
+.status-badge{
+  display:inline-block;
+  background:#ef8585;
+  color:#fff;
+  padding:2px 8px;
+  border-radius:6px;
+  font-size:10px;
+  margin-left:6px;
+  font-weight:bold;
+}
 
 /* 敵人頭像與皮膚相關樣式 */
 .enemy-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
@@ -120,6 +167,11 @@ footer{text-align:center;color:#748198;font-size:10px;margin:20px 0}
 }
 .skin-reset-btn:hover{color:var(--pink)}
 
+@keyframes pulse{
+  0%{transform:scale(0.98);opacity:0.9}
+  100%{transform:scale(1.02);opacity:1}
+}
+
 @media(max-width:520px){
   .card{padding:14px}
   .stats{grid-template-columns:1fr}
@@ -140,19 +192,26 @@ footer{text-align:center;color:#748198;font-size:10px;margin:20px 0}
 
 <section class="card stats">
   <div class="stat">
-    <div class="statline"><span>精神值 / HP</span><b id="hpText">100 / 100</b></div>
+    <div class="statline">
+      <span>精神值 / HP</span>
+      <b id="hpText">100 / 100</b>
+    </div>
     <div class="bar" role="progressbar" aria-label="玩家精神值" aria-valuemin="0" aria-valuemax="100" id="hpBarContainer">
       <div class="fill" id="hpBar"></div>
     </div>
   </div>
   <div class="stat">
-    <div class="statline"><span>目前進度</span><b id="progress">剛剛醒來</b></div>
+    <div class="statline">
+      <span>目前進度 <span id="statusTag"></span></span>
+      <b id="progress">剛剛醒來</b>
+    </div>
     <div class="statline"><span>背包</span><span id="itemCount">0 件道具</span></div>
     <div class="inventory" id="inventory"><span class="item">空空如也</span></div>
   </div>
 </section>
 
 <section class="card scene">
+  <div id="bannerWrap"></div>
   <div class="kicker" id="kicker">PROLOGUE / 03:00</div>
   <div class="story" id="story" aria-live="polite">你在系館的桌面上醒來。
 
@@ -201,60 +260,238 @@ footer{text-align:center;color:#748198;font-size:10px;margin:20px 0}
 
 <script>
 const $ = id => document.getElementById(id);
-let hp = 100, maxHp = 100, inventory = [], phase = "intro", eventData = null, enemy = null, stunned = false, burnTurns = 0, defend = false, gameEnded = false;
+let hp = 100, maxHp = 100, inventory = [], phase = "intro", eventData = null, enemy = null, defend = false, gameEnded = false;
+let dongsuanDebuff = false; // 造勢革命「凍蒜」狀態
+let battleTurnCount = 0;    // 戰鬥回合數計數
+let nextTrapAction = null;  // 貓咪地瓜騎士的陷阱行動
 
-const events = [
- {name:"貓",desc:"轉角的販賣機旁，有一隻貓正坐在紙箱上。牠看了你一眼，尾巴輕輕晃動。",choices:[
-  ["摸牠","你蹲下來摸摸牠。貓咪沒有躲開，還在你的手邊蹭了一下。精神值 +10。",()=>{heal(10);gain("貓毛");}],
-  ["餵牠","你把背包裡的零食分給牠。牠吃得很開心，還留下了一枚幸運鈴鐺。",()=>gain("幸運鈴鐺")],
-  ["不做任何事","你們互相看了一會兒，然後各自走向自己的夜晚。",()=>{}]
- ]},
- {name:"黑冠麻鷺",desc:"草地邊站著一隻黑冠麻鷺。牠一動也不動，像是在思考校園裡某個尚未完成的作業。",choices:[
-  ["拍照","你悄悄拍下一張照片。照片意外地清晰，讓你心情好了些。",()=>{gain("麻鷺照片");heal(5);}],
-  ["嚇跑牠","你突然拍手，黑冠麻鷺立刻振翅飛走。草叢裡掉出一枚硬幣。",()=>gain("校園硬幣")],
-  ["不做任何事","你沒有打擾牠，安靜地從旁邊走過。",()=>{}]
- ]},
- {name:"神秘青蛙人",desc:"路燈下站著一個穿著青蛙布偶裝的人。牠（或他）朝你揮手，手裡似乎拿著什麼。",choices:[
-  ["友好打招呼","你禮貌地揮手。青蛙人點點頭，送你一顆薄荷糖。",()=>gain("薄荷糖")],
-  ["冷嘲熱諷","你吐槽了這身打扮。青蛙人沉默片刻，丟下一張神秘貼紙。",()=>gain("神秘貼紙")],
-  ["不做任何事","你們保持著微妙的沉默，最後你決定繼續趕路。",()=>{}]
- ]}
-];
-
-// 怪物配置列表：可以在 image 欄位填寫本機圖片相對路徑（如 "./god67.png"）或網址
+// 怪物配置清單 (3取1隨機 + 心情不好的老師)
 const enemies = [
  {
-   name:"67號戰神",
-   icon:"⚡",
-   image:"", // 預設留空，若有圖片可填入路徑，如 "images/god67.png"
-   hp:65,
-   max:65,
-   attack:18,
-   skill:"戰神怒吼！你的下一次行動被暫停。",
-   special:"stun",
-   desc:"一個氣勢驚人的身影擋住去路。頭頂浮現「67」兩個大字。"
+   name: "67戰神",
+   icon: "⚡",
+   image: "",
+   hp: 67,
+   max: 67,
+   introBanner: "shout",
+   introText: "高喊【676767676767676767!!!!!!!!!!!!!!!】",
+   desc: "一個氣勢驚人的身影擋住去路，頭頂飄揚著「67」大旗，周圍空氣都發出震撼的音頻！",
+   action: function(turn) {
+     if (turn >= 2) {
+       // 技能：六十七號高歌離席
+       let dmg = 67;
+       if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+       hp -= dmg;
+       log("67戰神發動技能【六十七號高歌離席】！釋放毀天滅地的衝擊波，造成 " + dmg + " 點傷害後瀟灑離席！");
+       renderStats();
+       if (hp <= 0) {
+         dieCustom("（精神崩潰）", "你沒能承受住67戰神的終極衝擊波，倒在了離席的狂風中。\n\n遊戲結束。");
+         return;
+       }
+       // 存活則戰鬥結束，下一個事件必定撿到回血小瓶子
+       clearBanner();
+       setScene("BATTLE CLEAR / 67離席", "67戰神釋放完震撼全場的 67 點衝擊波後，高歌離去！\n\n就在他離開的空地上，一道溫暖的金光閃爍——地上竟然掉落了一個【回血小瓶子】！", [
+         {
+           label: "撿起【回血小瓶子】並喝下一半",
+           cls: "primary",
+           fn: () => {
+             gain("回血小瓶子");
+             heal(50);
+             log("你撿起了回血小瓶子並立刻調息，精神值大幅回復 50 點！");
+             winBattle();
+           }
+         }
+       ]);
+       return;
+     } else {
+       // 普攻：六十七號派對邀請 (6點 或 7點傷害)
+       let dmg = Math.random() < 0.5 ? 6 : 7;
+       if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+       hp -= dmg;
+       log("67戰神發動普攻【六十七號派對邀請】，對你造成 " + dmg + " 點傷害！");
+       renderStats();
+       if (hp <= 0) { die(); return; }
+       setScene("ENEMY TURN / 67戰神", "67戰神邀請你參加深夜派對，造成 " + dmg + " 點傷害！\n他似乎在聚集更強大的能量，準備高歌離席...", [
+         {label: "準備行動", cls: "primary", fn: playerTurn}
+       ]);
+     }
+   }
  },
  {
-   name:"adobe",
-   icon:"🎨",
-   image:"", // 若有圖片可填入路徑，如 "images/adobe.png"
-   hp:75,
-   max:75,
-   attack:14,
-   skill:"軟體更新通知彈出！接下來兩次行動各受到 5 點干擾傷害。",
-   special:"burn",
-   desc:"熟悉的紅色圖示在空中旋轉，無數未存檔的視窗朝你襲來。"
+   name: "選舉花車",
+   icon: "🚐",
+   image: "",
+   hp: 150,
+   max: 150,
+   introBanner: "broadcast",
+   introText: "遠處傳來一陣宏亮的劣質廣播：「懇請支持！拜託拜託！」",
+   desc: "一台裝飾刺眼、掛滿霓虹燈的宣傳車擋在路中央，音響播放著震耳欲聾的競選歌曲。",
+   action: function(turn) {
+     if (turn === 1 && !dongsuanDebuff) {
+       // 技能：造勢革命
+       dongsuanDebuff = true;
+       updateDebuffUI();
+       log("選舉花車發動技能【造勢革命】！狂熱的氣氛感染了你，之後每個行動結束都會忍不住喊【凍蒜】！");
+       setScene("ENEMY TURN / 選舉花車", "宣傳車放出洗腦的造勢口號！\n你被強迫參與造勢革命，精神受到干擾，直到遊戲結束或使用【選舉黑幕小本本】前，每次行動都會喊【凍蒜】！", [
+         {label: "頂住噪音應對", cls: "primary", fn: playerTurn}
+       ]);
+       return;
+     }
+     // 普攻：吵死你政治宣傳 (造成 10~14 傷害)
+     let dmg = Math.floor(Math.random() * 5) + 10;
+     if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+     hp -= dmg;
+     log("選舉花車發動普攻【吵死你政治宣傳】！劣質大喇叭造成 " + dmg + " 點精神干擾傷害。");
+     renderStats();
+     if (hp <= 0) { die(); return; }
+     setScene("ENEMY TURN / 選舉花車", "刺耳的宣傳廣播無休止地轟炸你的耳膜，造成 " + dmg + " 點傷害！", [
+       {label: "咬牙迎戰", cls: "primary", fn: playerTurn}
+     ]);
+   }
  },
  {
-   name:"競選花車",
-   icon:"🚐",
-   image:"", // 若有圖片可填入路徑，如 "images/truck.png"
-   hp:85,
-   max:85,
-   attack:8,
-   skill:"音響突然爆音！造成強烈精神衝擊。",
-   special:"burst",
-   desc:"遠方傳來音響聲，一台裝飾華麗的競選花車緩緩朝道路中央推進。"
+   name: "貓咪地瓜騎士",
+   icon: "🐱🍠",
+   image: "",
+   hp: 50,
+   max: 50,
+   introBanner: "danmaku",
+   introText: "【哇~是可愛的小茂咪~~還有可愛的地瓜，好可愛ㄚㄚㄚㄚㄚ!】",
+   desc: "一隻威風凜凜的小貓咪騎在一顆熱氣騰騰的巨大烤地瓜上，手持迷你叉子擺出騎士架勢！",
+   action: function(turn) {
+     let isBird = Math.random() < 0.5;
+     let dmg = 5;
+     if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+     hp -= dmg;
+     renderStats();
+     if (hp <= 0) { die(); return; }
+
+     if (isBird) {
+       nextTrapAction = "bird";
+       log("貓咪地瓜騎士發動普攻【小鳥鳥怪叫出擊!】造成 5 點傷害！奇怪的叫聲讓你心慌意亂！");
+       setScene("ENEMY TURN / 貓咪地瓜騎士", "小鳥鳥怪叫出擊！\n刺耳又奇異的怪叫造成 5 點傷害，你感覺精神被劇烈動搖！", [
+         {label: "穩住心神應對", cls: "primary", fn: playerTurn}
+       ]);
+     } else {
+       nextTrapAction = "cat";
+       log("貓咪地瓜騎士發動普攻【小貓貓爪爪出擊!】造成 5 點傷害！可愛肉球朝你撲來！");
+       setScene("ENEMY TURN / 貓咪地瓜騎士", "小貓貓爪爪出擊！\n粉嫩肉球帶著凌厲風壓抓了過來，造成 5 點傷害，萌力滿點！", [
+         {label: "穩住心神應對", cls: "primary", fn: playerTurn}
+       ]);
+     }
+   }
+ }
+];
+
+// 心情不好的老師 (由事件對話觸發的特殊戰鬥)
+const angryTeacherEnemy = {
+  name: "心情不好的老師",
+  icon: "🧑‍🏫",
+  image: "",
+  hp: 80,
+  max: 80,
+  desc: "老師臉色鐵青，身後浮現無數被紅筆批改退件的設計圖，殺氣四溢！",
+  action: function(turn) {
+    if (turn === 1) {
+      // 技能一：不悅的作業宣言 (召喚3隻15滴血作業小怪)
+      log("老師發動技能【不悅的作業宣言】！身邊召喚出 3 隻「未存檔小怪」（各15HP）協助干擾！");
+      let dmg = 8;
+      if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+      hp -= dmg;
+      renderStats();
+      if (hp <= 0) { die(); return; }
+      setScene("ENEMY TURN / 心情不好的老師", "老師大喝一聲，召喚出作業小怪群協同進攻，對你造成 " + dmg + " 點精神打擊！", [
+        {label: "面對作業壓力", cls: "primary", fn: playerTurn}
+      ]);
+      return;
+    } else if (turn === 3) {
+      // 技能二：低氣壓衝擊 (天降雷擊 25 點傷害)
+      let dmg = 25;
+      if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+      hp -= dmg;
+      log("老師釋放終極技能【低氣壓衝擊】！天降雷擊造成 " + dmg + " 點重創！");
+      renderStats();
+      if (hp <= 0) { die(); return; }
+      setScene("ENEMY TURN / 心情不好的老師", "整條走廊被暴風雷擊覆蓋！天降雷擊造成高達 " + dmg + " 點重創！", [
+        {label: "奮力支撐", cls: "primary", fn: playerTurn}
+      ]);
+      return;
+    } else {
+      // 普攻：朝玩家怒吼 (3點攻擊)
+      let dmg = 3;
+      if (defend) { dmg = Math.ceil(dmg * 0.5); defend = false; }
+      hp -= dmg;
+      log("老師朝你怒吼：「字體沒有轉曲！間距也不對！」造成 " + dmg + " 點傷害。");
+      renderStats();
+      if (hp <= 0) { die(); return; }
+      setScene("ENEMY TURN / 心情不好的老師", "老師怒斥你的排版細節，造成 " + dmg + " 點傷害！", [
+        {label: "準備回擊", cls: "primary", fn: playerTurn}
+      ]);
+    }
+  }
+};
+
+// 隨機事件清單 (3取1)
+const events = [
+ {
+   id: "cat",
+   name: "遇到貓咪",
+   desc: "夜深人靜的轉角處，一隻可愛的黑白花貓正端坐在路燈下看著你。",
+   choices: [
+     ["摸牠", "你蹲下輕撫貓咪，貓咪舒服地發出呼嚕聲，在你的手指間蹭了蹭。\n精神值 +10。", () => { heal(10); }],
+     ["不管", "你心繫床鋪，默默看了一眼貓咪後安靜走過。夜晚依然平靜。", () => {}],
+     ["餵食", "你從背包拿出一塊小餅乾遞過去。\n突然！貓咪在一陣粉紅魔法煙霧中「碰」的一聲站了起來，竟然變成了可愛的貓娘！\n\n貓娘對你比了一個愛心：「謝謝大善人喵！這個秘密小本本送你當謝禮喵！」", () => {
+       gain("選舉黑幕小本本");
+       heal(15);
+     }]
+   ]
+ },
+ {
+   id: "potato",
+   name: "遇到地瓜",
+   desc: "校園小徑的長椅上，不知道是誰留下一顆熱氣騰騰的香甜烤地瓜，散發出誘人的香氣。",
+   choices: [
+     ["摸牠", "你好奇地伸手摸了一下。\n烤地瓜居然猛地睜開眼睛，長出雙手雙腳變成生氣地瓜人！它氣鼓鼓地狠狠瞪了你一眼，隨後邁開短腿狂奔逃走！\n你被嚇了一大跳，精神值 -5。", () => {
+       hp = Math.max(1, hp - 5);
+       log("受到地瓜人驚嚇，精神值 -5。");
+       renderStats();
+     }],
+     ["不管", "深夜在路上出現熱地瓜實在太可疑了，你決定當作沒看見，繞道而過。", () => {}],
+     ["餵食", "你倒了幾滴礦泉水在小蓋子遞給它。\n烤地瓜像是活了過來，歡快地跳了起來，親暱地蹭了蹭你的小腿！\n一股暖流湧上心頭，精神大振！它還留下一瓶神奇藥水。", () => {
+       gain("回血小瓶子");
+       heal(20);
+     }]
+   ]
+ },
+ {
+   id: "teacher",
+   name: "遇到老師",
+   desc: "", // 動態產生開心或生氣
+   init: function() {
+     let isHappy = Math.random() < 0.5;
+     if (isHappy) {
+       this.desc = "走廊轉角迎面走來一位老師，臉上掛著慈祥的微笑：\n\n【晚安陳垣臻同學，這麼晚了怎麼還在外面？】";
+       this.choices = [
+         ["老師晚安 我很努力的做基設到剛剛", "老師欣慰地點點頭：「真認真！但設計是長跑，健康第一，快回去休息吧。」\n老師遞給你一瓶提神補給！", () => {
+           gain("回血小瓶子");
+           heal(25);
+         }],
+         ["乾你屁事", "老師愣了三秒，推了推眼鏡笑道：「哈哈...年輕人個性真鮮明。快回宿舍睡覺吧，別在外面遊蕩。」", () => {}],
+         ["老師你怎麼也在這裡", "老師笑著嘆口氣：「我剛在系辦改完大家交的作業呢。夜深了，回宿舍路上小心！」", () => { heal(10); }]
+       ];
+     } else {
+       this.desc = "昏暗的路燈下站著一位老師，雙手抱胸、眉頭緊鎖、臉色鐵青：\n\n【晚安陳垣臻同學，這麼晚了怎麼還在外面？】";
+       this.choices = [
+         ["老師晚安 我很努力的做基設到剛剛", "老師深深嘆了口氣，語氣稍微放緩：「基設作業好好做，別熬壞了身子，趕緊回宿舍睡覺去吧。」", () => {}],
+         ["乾你屁事", "【觸發戰鬥！】\n老師眉頭一豎，怒火瞬間炸裂：「你說什麼？！作業重做！給我留下來好好上課！」", () => {
+           triggerAngryTeacherBattle();
+         }],
+         ["老師你怎麼也在這裡", "【觸發戰鬥！】\n老師臉色瞬間陰沉得像暴風雨：「我改你們這屆的作業改到血壓狂飆！你還有臉問我在這裡幹嘛？！」", () => {
+           triggerAngryTeacherBattle();
+         }]
+       ];
+     }
+   }
  }
 ];
 
@@ -265,15 +502,25 @@ function log(t){
   $("log").scrollTop = $("log").scrollHeight;
 }
 
+function updateDebuffUI(){
+  let tag = $("statusTag");
+  if (dongsuanDebuff) {
+    tag.innerHTML = '<span class="status-badge">📣 凍蒜革命中</span>';
+  } else {
+    tag.innerHTML = '';
+  }
+}
+
 function renderStats(){
-  $("hpText").textContent = hp + " / " + maxHp;
+  $("hpText").textContent = Math.max(0, hp) + " / " + maxHp;
   let pct = Math.max(0, (hp / maxHp) * 100);
   $("hpBar").style.width = pct + "%";
-  $("hpBarContainer").setAttribute("aria-valuenow", hp);
+  $("hpBarContainer").setAttribute("aria-valuenow", Math.max(0, hp));
   $("itemCount").textContent = inventory.length + " 件道具";
   $("inventory").innerHTML = inventory.length 
     ? inventory.map(x => '<span class="item">' + x + '</span>').join("") 
     : '<span class="item">空空如也</span>';
+  updateDebuffUI();
 }
 
 function updateEnemy(){
@@ -284,14 +531,23 @@ function updateEnemy(){
   $("enemyBarContainer").setAttribute("aria-valuenow", Math.max(0, enemy.hp));
 }
 
-// 更新敵人頭像 / 皮膚外觀
+function setBanner(type, text) {
+  let w = $("bannerWrap");
+  if (!type) { w.innerHTML = ""; return; }
+  let cls = type === "danmaku" ? "danmaku-banner" : (type === "shout" ? "shout-banner" : "broadcast-banner");
+  w.innerHTML = `<div class="${cls}">${text}</div>`;
+}
+
+function clearBanner() {
+  $("bannerWrap").innerHTML = "";
+}
+
 function updateEnemyAvatar(){
   if (!enemy) return;
   const avatarImg = $("enemyAvatar");
   const placeholder = $("enemyAvatarPlaceholder");
   const resetBtn = $("skinResetBtn");
 
-  // 1. 優先檢查玩家自訂上傳的皮膚 (localStorage)
   const savedSkin = localStorage.getItem("skin_" + enemy.name);
   if (savedSkin) {
     avatarImg.src = savedSkin;
@@ -301,7 +557,6 @@ function updateEnemyAvatar(){
     return;
   }
 
-  // 2. 若無自訂上傳，檢查預設的 enemy.image
   if (enemy.image) {
     avatarImg.src = enemy.image;
     avatarImg.onload = () => {
@@ -316,7 +571,6 @@ function updateEnemyAvatar(){
     return;
   }
 
-  // 3. 無圖片時顯示預設圖示 (Icon)
   avatarImg.classList.remove("visible");
   avatarImg.src = "";
   placeholder.textContent = enemy.icon || "👾";
@@ -324,7 +578,6 @@ function updateEnemyAvatar(){
   resetBtn.style.display = "none";
 }
 
-// 玩家點擊更換皮膚時觸發
 function uploadMonsterSkin(event){
   const file = event.target.files && event.target.files[0];
   if (!file || !enemy) return;
@@ -340,10 +593,9 @@ function uploadMonsterSkin(event){
     log("已為「" + enemy.name + "」換上新的外觀！");
   };
   reader.readAsDataURL(file);
-  event.target.value = ""; // 清空選取狀態
+  event.target.value = "";
 }
 
-// 重設為預設外觀
 function resetMonsterSkin(){
   if (!enemy) return;
   localStorage.removeItem("skin_" + enemy.name);
@@ -359,8 +611,14 @@ function heal(n){
 
 function gain(x){
   inventory.push(x);
-  log("獲得道具：" + x + "。");
+  log("獲得道具：【" + x + "】！");
   renderStats();
+}
+
+function checkDongsuan(){
+  if (dongsuanDebuff) {
+    log("📣 受造勢革命影響，你忍不住大聲高喊：【凍蒜！凍蒜！】");
+  }
 }
 
 function setScene(k, s, buttons, isHtml = false){
@@ -383,12 +641,13 @@ function setScene(k, s, buttons, isHtml = false){
 function startGame(){
   phase = "event";
   $("progress").textContent = "校園夜行";
-  log("你離開系館，走進凌晨三點的校園。");
+  log("你離開系館，踏進凌晨三點的靜謐校園。");
   showEvent();
 }
 
 function showEvent(){
   eventData = events[Math.floor(Math.random() * events.length)];
+  if (eventData.init) eventData.init();
   $("progress").textContent = "遭遇事件";
   setScene("RANDOM EVENT / " + eventData.name, eventData.desc, eventData.choices.map(c => ({
     label: c[0],
@@ -398,55 +657,93 @@ function showEvent(){
 
 function chooseEvent(c){
   c[2]();
-  setScene("EVENT CLEAR / " + eventData.name, c[1] + "\n\n你重新整理背包，繼續往宿舍的方向走。", [
-    {label:"繼續前進", cls:"primary", fn:showBattle}
+  if (phase === "battle") return; // 若事件直接引發戰鬥
+  setScene("EVENT CLEAR / " + eventData.name, c[1] + "\n\n你重新整頓行裝，繼續朝宿舍邁進。", [
+    {label: "繼續前進", cls: "primary", fn: showBattle}
   ]);
 }
 
+// 事件引發生氣老師戰鬥
+function triggerAngryTeacherBattle(){
+  phase = "battle";
+  enemy = JSON.parse(JSON.stringify(angryTeacherEnemy));
+  enemy.action = angryTeacherEnemy.action;
+  battleTurnCount = 0;
+  defend = false;
+  nextTrapAction = null;
+  clearBanner();
+  $("battlePanel").classList.remove("hidden");
+  $("progress").textContent = "遭遇激戰";
+  $("enemyName").textContent = enemy.name;
+  $("battleHint").textContent = enemy.desc;
+  updateEnemy();
+  updateEnemyAvatar();
+  log("憤怒的老師擋在前方：「今天不把你教會，誰都別想睡！」");
+  playerTurn();
+}
+
+// 常規 3 取 1 戰鬥
 function showBattle(){
   phase = "battle";
-  enemy = JSON.parse(JSON.stringify(enemies[Math.floor(Math.random() * enemies.length)]));
-  stunned = false;
-  burnTurns = 0;
+  let template = enemies[Math.floor(Math.random() * enemies.length)];
+  enemy = JSON.parse(JSON.stringify(template));
+  enemy.action = template.action;
+  battleTurnCount = 0;
   defend = false;
+  nextTrapAction = null;
+  
+  if (enemy.introBanner) {
+    setBanner(enemy.introBanner, enemy.introText);
+  } else {
+    clearBanner();
+  }
+
   $("battlePanel").classList.remove("hidden");
   $("progress").textContent = "遭遇戰鬥";
   $("enemyName").textContent = enemy.name;
   $("battleHint").textContent = enemy.desc;
   updateEnemy();
   updateEnemyAvatar();
-  log("阻礙出現：" + enemy.name + "！");
+  log("阻礙現身：" + enemy.name + "！" + (enemy.introText ? " " + enemy.introText : ""));
   playerTurn();
 }
 
 function playerTurn(){
   if (gameEnded) return;
-  if (stunned) {
-    stunned = false;
-    log("你被氣勢壓迫，這回合無法行動！");
-    setScene("PLAYER TURN / 行動中止", "你努力想邁開腳步，但精神壓力讓你動彈不得。這回合只能原地防守。", [
-      {label:"承受對方行動", cls:"primary", fn:enemyAction}
-    ]);
-    return;
-  }
-  
-  let dot = burnTurns > 0 ? 5 : 0;
-  if (dot) {
-    hp -= dot;
-    burnTurns--;
-    log("干擾影響造成 " + dot + " 點精神損耗。");
-    renderStats();
-    if (hp <= 0) { die(); return; }
-  }
+  battleTurnCount++;
 
   let buttons = [
-    {label:"常規應對（造成 25 傷害）", cls:"primary", fn:() => playerAttack(25)},
-    {label:"架起防禦（下次受傷減半）", fn:()=>{ defend = true; log("你集中精神做好防禦姿態。"); enemyAction(); }}
+    {label: "常規應對（造成 25 傷害）", cls: "primary", fn: () => playerAttack(25)},
+    {label: "架起防禦（下次受傷減半）", fn: () => { 
+      defend = true; 
+      log("你集中精神做好防守架勢。"); 
+      checkDongsuan();
+      enemyAction(); 
+    }}
   ];
-  if (inventory.length) {
-    buttons.push({label:"使用道具", fn:openItemMenu});
+
+  // 貓咪地瓜騎士的特殊陷阱按鈕
+  if (nextTrapAction === "bird") {
+    buttons.push({
+      label: "【不要打我~~】",
+      cls: "trap",
+      fn: () => dieCustom("（結局：被地瓜當地瓜烤了）", "你被小鳥鳥怪叫嚇破了膽，跪地求饒喊著「不要打我~~」！\n地瓜騎士冷酷地生起熊熊炭火，把你當成特級紅春地瓜放進烤爐裡烤得香噴噴。\n\n任務失敗：你變成了校園傳說中的深夜烤地瓜。")
+    });
+  } else if (nextTrapAction === "cat") {
+    buttons.push({
+      label: "【好可怕噢~~】",
+      cls: "trap",
+      fn: () => dieCustom("（結局：被貓咪綁架了）", "你被小貓貓爪爪萌到失去抵抗力，眼冒愛心尖叫著「好可怕噢~~」！\n小貓咪露出霸道總裁的邪魅一笑，一爪把你套進麻布袋，綁架回貓貓帝國當全職鏟屎官，再也回不了宿舍了。\n\n任務失敗：你成為了貓星人的奴隸。")
+    });
   }
-  setScene("PLAYER TURN / 選擇行動", "你看準空檔，準備採取行動。" + (burnTurns > 0 ? "\n干擾效果剩餘 " + burnTurns + " 次。" : ""), buttons);
+
+  if (inventory.length) {
+    buttons.push({label: "使用道具", fn: openItemMenu});
+  }
+
+  let prompt = "你看準空檔，準備採取行動。";
+  if (dongsuanDebuff) prompt += "\n（你心中滿是「凍蒜」的激昂回音）";
+  setScene("PLAYER TURN / 選擇行動", prompt, buttons);
 }
 
 function openItemMenu(){
@@ -454,34 +751,41 @@ function openItemMenu(){
     label: item,
     fn: () => useSpecificItem(idx)
   }));
-  itemButtons.push({label:"‹ 返回行動選單", fn:playerTurn});
+  itemButtons.push({label: "‹ 返回行動選單", fn: playerTurn});
   setScene("INVENTORY / 選擇要使用的道具", "背包中有以下物品，請選擇一項：", itemButtons);
 }
 
 function useSpecificItem(index){
   let item = inventory.splice(index, 1)[0];
   renderStats();
-  if (item === "薄荷糖" || item === "貓毛") {
+  if (item === "回血小瓶子") {
+    heal(50);
+    log("咕嚕咕嚕喝下【回血小瓶子】，精神力大爆發！恢復 50 點精神值！");
+  } else if (item === "選舉黑幕小本本") {
+    dongsuanDebuff = false;
+    updateDebuffUI();
+    log("你翻開了【選舉黑幕小本本】！揭發了宣傳車的黑幕，造勢革命徹底瓦解，你不再喊凍蒜了！");
+    if (enemy && enemy.name === "選舉花車") {
+      log("選舉花車因黑幕曝光陷入混亂，體力大扣 40 點！");
+      enemy.hp -= 40;
+      updateEnemy();
+      if (enemy.hp <= 0) { winBattle(); return; }
+    }
+  } else if (item === "薄荷糖") {
     heal(20);
-    log("使用了 " + item + "，精神提振了！");
-  } else if (item === "幸運鈴鐺" || item === "校園硬幣") {
-    log("你握緊 " + item + "，受到鼓舞，全力反擊造成 35 點傷害！");
-    playerAttack(35);
-    return;
-  } else if (item === "麻鷺照片") {
-    log("你出示了「麻鷺照片」，對手愣住了！本回合獲得喘息機會。");
-    enemy.hp -= 10;
-    updateEnemy();
+    log("吃了薄荷糖，一陣清涼湧上心頭，恢復 20 點精神！");
   } else {
-    log("你拿出了 " + item + "，散發出神祕的氛圍，稍微穩定了心神。");
+    log("你出示了 " + item + "，稍微穩定了心神，恢復 10 點精神。");
     heal(10);
   }
+  checkDongsuan();
   enemyAction();
 }
 
 function playerAttack(dmg){
+  checkDongsuan();
   enemy.hp -= dmg;
-  log("你採取行動，對 " + enemy.name + " 造成 " + dmg + " 點傷害。");
+  log("你果斷採取行動，對 " + enemy.name + " 造成 " + dmg + " 點傷害！");
   updateEnemy();
   if (enemy.hp <= 0) {
     winBattle();
@@ -492,68 +796,53 @@ function playerAttack(dmg){
 
 function enemyAction(){
   if (gameEnded || phase !== "battle") return;
-  let msg = "";
-  if (enemy.special === "stun" && !enemy.usedSkill) {
-    enemy.usedSkill = true;
-    stunned = true;
-    msg = enemy.skill;
-    log(msg);
-  } else if (enemy.special === "burn" && !enemy.usedSkill) {
-    enemy.usedSkill = true;
-    burnTurns = 2;
-    msg = enemy.skill;
-    log(msg);
-  } else {
-    let dmg = enemy.attack;
-    if (enemy.special === "burst" && Math.random() < 0.25) {
-      dmg = Math.round(enemy.attack * 2.2);
-      msg = enemy.skill + " 造成重創 " + dmg + " 點！";
-    } else {
-      msg = enemy.name + " 發動行動，造成 " + dmg + " 點傷害。";
-    }
-    if (defend) {
-      dmg = Math.ceil(dmg * 0.5);
-      defend = false;
-      msg += "（你的防禦抵擋了部分傷害）";
-    }
-    hp -= dmg;
-    log(msg);
-    renderStats();
+  nextTrapAction = null; // 重設陷阱狀態
+  if (enemy.action) {
+    enemy.action(battleTurnCount);
   }
-  if (hp <= 0) { die(); return; }
-  setScene("ENEMY TURN / " + enemy.name, msg + "\n\n敵方行動結束，輪到你了。", [
-    {label:"確認戰況", cls:"primary", fn:playerTurn}
-  ]);
 }
 
 function winBattle(){
   phase = "after";
+  clearBanner();
   $("battlePanel").classList.add("hidden");
   $("progress").textContent = "突破阻礙";
-  log("阻礙解除，前方就是宿舍門口。");
-  setScene("BATTLE CLEAR / SAFE ROUTE", "眼前的混亂終於平息。你拍拍外套，確認鑰匙與手機都在口袋裡。\n\n夜風變得柔和，宿舍大門的感應燈就在前方十公尺。", [
-    {label:"刷卡進宿舍", cls:"primary", fn:endGame}
+  log("阻礙徹底解除！宿舍就在眼前。");
+  setScene("BATTLE CLEAR / SAFE ROUTE", "眼前的混亂平息，前方傳來熟悉的宿舍感應門鈴聲。\n夜風吹拂，手心握著寢室鑰匙。\n\n今晚的冒險即將平安落幕。", [
+    {label: "刷卡進宿舍", cls: "primary", fn: endGame}
   ]);
 }
 
 function die(){
+  dieCustom("（精神耗盡）", "精神值歸零。你再也撐不住沉重的眼皮。\n這趟回宿舍的夜路，暫時停在了這裡。");
+}
+
+function dieCustom(title, text){
   gameEnded = true;
   phase = "dead";
-  $("progress").textContent = "精神耗盡";
+  clearBanner();
+  $("progress").textContent = "旅程中斷";
   $("battlePanel").classList.add("hidden");
-  setScene("GAME OVER / 03:??", "精神值歸零。你再也撐不住沉重的眼皮。\n\n這趟回宿舍的夜路，暫時停在這裡。", [
-    {label:"重新嘗試", cls:"warn", fn:() => location.reload()}
+  setScene("GAME OVER " + title, text, [
+    {label: "重新出發", cls: "warn", fn: () => location.reload()}
   ]);
-  log("你在通往宿舍的長椅上昏睡了過去。遊戲結束。");
+  log("遊戲結束：" + title);
 }
 
 function endGame(){
   gameEnded = true;
   phase = "end";
-  $("progress").textContent = "已抵達宿舍";
-  $("clock").textContent = "03:25 AM";
-  setScene("ENDING / GOOD NIGHT", "你終於回到宿舍，關上房門，把背包放在桌邊。\n\n洗漱完畢後，你躺進熟悉的床鋪。今天的作業、奇怪的遭遇，以及校園裡的聲響，都暫時留在了門外。\n\n<em>晚安。這次真的可以好好睡了。</em>", [
-    {label:"再玩一次", cls:"primary", fn:() => location.reload()}
+  clearBanner();
+  $("progress").textContent = "平安抵達";
+  $("clock").textContent = "03:30 AM";
+  let endingText = "你終於回到宿舍，關上房門，把背包放在桌邊。\n\n洗漱完畢後，你躺進溫暖熟悉的床鋪。今晚遭遇的奇怪生物、奇異事件，都暫時留在了門外。";
+  if (dongsuanDebuff) {
+    endingText += "\n\n（臨睡前，你夢話裡還在輕輕喊著：凍蒜...凍蒜...）";
+  }
+  endingText += "\n\n<em>晚安。今天辛苦了，這次真的可以好好睡了。</em>";
+  
+  setScene("ENDING / GOOD NIGHT", endingText, [
+    {label: "再玩一次", cls: "primary", fn: () => location.reload()}
   ], true);
   log("任務達成：平安返回寢室，結束今天。");
 }
